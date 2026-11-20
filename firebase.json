@@ -1,0 +1,19 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Split the Bill",
+        "supportEmail": "taxicashflow@gmail.com",
+        "authorizedRedirectUris": [
+          "https://split-the-bill-th.firebaseapp.com/__/auth/handler",
+          "https://split-the-bill.taxicashflow.workers.dev",
+          "http://localhost:5173"
+        ]
+      }
+    }
+  }
+}

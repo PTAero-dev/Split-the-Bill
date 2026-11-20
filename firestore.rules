@@ -1,0 +1,258 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes owner-scoped personal data under
+// /users/{userId}, where userId matches request.auth.uid:
+//
+// Collection: users
+// Document ID: {userId} (Firebase Auth UID)
+// Fields:
+//   - version: int (required, == 1)
+//   - myName: string (required, 1..100 chars)
+//   - myAvatarDataUrl: string | null (required key, <= 200000 chars when string)
+//   - paymentProfile: map (required, exact keys):
+//       - promptPayId: string (required, <= 120 chars)
+//       - accountName: string (required, <= 120 chars)
+//       - bankName: string (required, <= 120 chars)
+//       - accountNumber: string (required, <= 120 chars)
+//       - customQrImageDataUrl: string | null (required key, <= 600000 chars when string)
+//       - preferredQrMode: string (required, 'promptpay_dynamic' | 'custom_image')
+//   - seededBuiltInTemplateIds: list (required, <= 50 items)
+//   - updatedAt: string (required, <= 64 chars)
+//
+// Subcollection: users/{userId}/friends
+// Document ID: {friendId}
+// Fields:
+//   - id: string (required, == friendId)
+//   - name: string (required, 1..100 chars)
+//   - color: string (required, <= 40 chars)
+//   - avatarDataUrl: string | null (required key, <= 200000 chars when string)
+//   - isDefaultGroup: bool (required)
+//   - note: string (required, <= 300 chars)
+//   - updatedAt: string (required, <= 64 chars)
+//
+// Subcollection: users/{userId}/shopTemplates
+// Document ID: {templateId}
+// Fields:
+//   - id: string (required, == templateId)
+//   - name: string (required, 1..120 chars)
+//   - category: string (required, 'restaurant' | 'cafe' | 'supermarket' | 'sushi' | 'other')
+//   - serviceChargeRate: int | float (required, 0..100)
+//   - vatRate: int | float (required, 0..100)
+//   - vatOnServiceCharge: bool (required)
+//   - plateTiers: list (required, <= 30 items)
+//   - isPinned: bool (required)
+//   - lastUsedAt: string (required, <= 64 chars)
+//   - updatedAt: string (required, <= 64 chars)
+//
+// Subcollection: users/{userId}/sessions
+// Document ID: {sessionId}
+// Fields:
+//   - id: string (required, == sessionId)
+//   - date: string (required, <= 32 chars)
+//   - title: string (required, <= 200 chars)
+//   - includeMe: bool (required)
+//   - participantIds: list (required, <= 100 items)
+//   - roundingMode: string (required, 'exact' | 'round_baht' | 'ceil_baht')
+//   - receipts: list (required, <= 50 items)
+//   - paidStatus: map (required, <= 100 entries)
+//   - createdAt: string (required, <= 64 chars)
+//   - updatedAt: string (required, <= 64 chars)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request carries a valid Firebase Authentication context.
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated caller owns the user-scoped path.
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Enforce exact map keys (no missing required keys and no extra fields).
+    function hasExactFields(data, fields) {
+      return data.keys().hasOnly(fields) && data.keys().hasAll(fields);
+    }
+
+    // Validate a string within an inclusive length range.
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // Validate a string with an upper length bound (empty string allowed).
+    function isBoundedString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    // Validate a nullable string with an upper length bound.
+    function isNullableString(val, maxLen) {
+      return val == null || (val is string && val.size() <= maxLen);
+    }
+
+    // Validate a list with a maximum item count.
+    function isValidList(val, maxSize) {
+      return val is list && val.size() <= maxSize;
+    }
+
+    // Validate a percentage value in [0, 100] (supports int or float, rejects NaN).
+    function isValidRate(val) {
+      return (val is int || val is float) && val >= 0 && val <= 100;
+    }
+
+    // ===============================================================
+    // Domain Validators (Invoked on both create and update)
+    // ===============================================================
+
+    function isValidPaymentProfile(profile) {
+      return profile is map &&
+             hasExactFields(profile, [
+               'promptPayId',
+               'accountName',
+               'bankName',
+               'accountNumber',
+               'customQrImageDataUrl',
+               'preferredQrMode'
+             ]) &&
+             isBoundedString(profile.promptPayId, 120) &&
+             isBoundedString(profile.accountName, 120) &&
+             isBoundedString(profile.bankName, 120) &&
+             isBoundedString(profile.accountNumber, 120) &&
+             isNullableString(profile.customQrImageDataUrl, 600000) &&
+             profile.preferredQrMode is string &&
+             profile.preferredQrMode in ['promptpay_dynamic', 'custom_image'];
+    }
+
+    function isValidUserProfile(data) {
+      return hasExactFields(data, [
+               'version',
+               'myName',
+               'myAvatarDataUrl',
+               'paymentProfile',
+               'seededBuiltInTemplateIds',
+               'updatedAt'
+             ]) &&
+             data.version is int && data.version == 1 &&
+             isValidString(data.myName, 1, 100) &&
+             isNullableString(data.myAvatarDataUrl, 200000) &&
+             isValidPaymentProfile(data.paymentProfile) &&
+             isValidList(data.seededBuiltInTemplateIds, 50) &&
+             isBoundedString(data.updatedAt, 64);
+    }
+
+    function isValidFriend(data, friendId) {
+      return hasExactFields(data, [
+               'id',
+               'name',
+               'color',
+               'avatarDataUrl',
+               'isDefaultGroup',
+               'note',
+               'updatedAt'
+             ]) &&
+             data.id is string && data.id == friendId &&
+             isValidString(data.name, 1, 100) &&
+             isBoundedString(data.color, 40) &&
+             isNullableString(data.avatarDataUrl, 200000) &&
+             data.isDefaultGroup is bool &&
+             isBoundedString(data.note, 300) &&
+             isBoundedString(data.updatedAt, 64);
+    }
+
+    function isValidShopTemplate(data, templateId) {
+      return hasExactFields(data, [
+               'id',
+               'name',
+               'category',
+               'serviceChargeRate',
+               'vatRate',
+               'vatOnServiceCharge',
+               'plateTiers',
+               'isPinned',
+               'lastUsedAt',
+               'updatedAt'
+             ]) &&
+             data.id is string && data.id == templateId &&
+             isValidString(data.name, 1, 120) &&
+             data.category is string &&
+             data.category in ['restaurant', 'cafe', 'supermarket', 'sushi', 'other'] &&
+             isValidRate(data.serviceChargeRate) &&
+             isValidRate(data.vatRate) &&
+             data.vatOnServiceCharge is bool &&
+             isValidList(data.plateTiers, 30) &&
+             data.isPinned is bool &&
+             isBoundedString(data.lastUsedAt, 64) &&
+             isBoundedString(data.updatedAt, 64);
+    }
+
+    function isValidSession(data, sessionId) {
+      return hasExactFields(data, [
+               'id',
+               'date',
+               'title',
+               'includeMe',
+               'participantIds',
+               'roundingMode',
+               'receipts',
+               'paidStatus',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             data.id is string && data.id == sessionId &&
+             isBoundedString(data.date, 32) &&
+             isBoundedString(data.title, 200) &&
+             data.includeMe is bool &&
+             isValidList(data.participantIds, 100) &&
+             data.roundingMode is string &&
+             data.roundingMode in ['exact', 'round_baht', 'ceil_baht'] &&
+             isValidList(data.receipts, 50) &&
+             data.paidStatus is map && data.paidStatus.size() <= 100 &&
+             isBoundedString(data.createdAt, 64) &&
+             isBoundedString(data.updatedAt, 64);
+    }
+
+    // ===============================================================
+    // Collection & Subcollection Rules
+    // ===============================================================
+
+    // User profile & payment settings: strict owner-only access.
+    match /users/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUserProfile(request.resource.data);
+
+      // Saved friends / default split participants.
+      match /friends/{friendId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidFriend(request.resource.data, friendId);
+      }
+
+      // Custom / seeded shop templates.
+      match /shopTemplates/{templateId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidShopTemplate(request.resource.data, templateId);
+      }
+
+      // Bill-splitting sessions & receipt lists.
+      match /sessions/{sessionId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSession(request.resource.data, sessionId);
+      }
+    }
+
+    // Default deny all unmatched paths.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

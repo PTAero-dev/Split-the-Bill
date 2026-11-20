@@ -1,16 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { CheckCircle2 } from 'lucide-react';
 import { AppHeader, TopTab } from './components/AppHeader';
+import {
+  CloudSyncButton,
+  type CloudSyncStateView,
+  type CloudSyncStatus,
+} from './components/CloudSyncButton';
 import { FriendsManager } from './components/FriendsManager';
 import { PaymentProfileView } from './components/PaymentProfileView';
 import { SessionListView } from './components/SessionListView';
 import { SessionWorkspace } from './components/SessionWorkspace';
+import {
+  buildSyncFingerprint,
+  computeSyncDiff,
+  fetchUserCloudSnapshot,
+  hasAnySyncDiff,
+  mergeCloudAndLocalState,
+  pushSyncDiffToCloud,
+  subscribeUserCloudState,
+  type SyncFingerprint,
+} from './lib/cloudSync';
+import {
+  auth,
+  consumeRedirectSignIn,
+  signInWithGoogleAccount,
+  signOutFromCloud,
+} from './lib/firebase';
 import { createId, todayIsoDate } from './lib/format';
 import { normalizePromptPayTarget } from './lib/promptpay';
 import {
   createDemoData,
   createEmptyReceipt,
   loadAppState,
+  normalizeAppState,
   saveAppState,
 } from './lib/storage';
 import {
@@ -27,6 +50,21 @@ export function App() {
   const [activeTab, setActiveTab] = useState<TopTab>('sessions');
   const [toast, setToast] = useState<string | null>(null);
 
+  const [cloudUser, setCloudUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>(() =>
+    typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'idle',
+  );
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
+
+  const lastSyncedFpRef = useRef<SyncFingerprint | null>(null);
+  const initialSyncDoneUidRef = useRef<string | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
+
   useEffect(() => {
     const res = saveAppState(state);
     if (!res.ok && res.error) {
@@ -39,6 +77,339 @@ export function App() {
     const timer = setTimeout(() => setToast(null), 3200);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // Firebase Auth listener + handle redirect sign-in result if popup was blocked
+  useEffect(() => {
+    consumeRedirectSignIn().catch((err: unknown) => {
+      const msg =
+        err instanceof Error ? err.message : 'เข้าสู่ระบบ Google ไม่สำเร็จ';
+      setSyncError(msg);
+      setToast(msg);
+    });
+
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCloudUser(user);
+      setAuthLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  // Network connectivity listener
+  useEffect(() => {
+    const handleOffline = () => {
+      setSyncStatus('offline');
+    };
+    const handleOnline = async () => {
+      const uid = cloudUser?.uid;
+      if (!uid || initialSyncDoneUidRef.current !== uid) {
+        setSyncStatus('idle');
+        return;
+      }
+      const current = latestStateRef.current;
+      const diff = computeSyncDiff(lastSyncedFpRef.current, current);
+      if (!hasAnySyncDiff(diff)) {
+        setSyncStatus('synced');
+        return;
+      }
+      try {
+        setSyncStatus('syncing');
+        setSyncError(null);
+        await pushSyncDiffToCloud(uid, diff, current);
+        lastSyncedFpRef.current = buildSyncFingerprint(current);
+        setSyncStatus('synced');
+        setLastSyncedAt(new Date().toISOString());
+      } catch (err) {
+        setSyncStatus('error');
+        setSyncError(
+          err instanceof Error ? err.message : 'ซิงค์ข้อมูลไม่สำเร็จ',
+        );
+      }
+    };
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [cloudUser?.uid]);
+
+  // Initial fetch/merge + real-time Firestore subscription when signed in
+  useEffect(() => {
+    const uid = cloudUser?.uid;
+    if (!uid) {
+      initialSyncDoneUidRef.current = null;
+      lastSyncedFpRef.current = null;
+      setSyncStatus(
+        typeof navigator !== 'undefined' && !navigator.onLine
+          ? 'offline'
+          : 'idle',
+      );
+      setSyncError(null);
+      return;
+    }
+
+    let cancelled = false;
+    let unsubRemote: (() => void) | null = null;
+
+    const initCloudSync = async () => {
+      setSyncStatus('syncing');
+      setSyncError(null);
+
+      try {
+        const cloudSnapshot = await fetchUserCloudSnapshot(uid);
+        if (cancelled) return;
+
+        const { merged, needsUpload } = mergeCloudAndLocalState(
+          latestStateRef.current,
+          cloudSnapshot,
+        );
+
+        if (needsUpload) {
+          const baselineFp = cloudSnapshot
+            ? buildSyncFingerprint(normalizeAppState(cloudSnapshot))
+            : null;
+          const uploadDiff = computeSyncDiff(baselineFp, merged);
+          if (hasAnySyncDiff(uploadDiff)) {
+            await pushSyncDiffToCloud(uid, uploadDiff, merged);
+          }
+        }
+        if (cancelled) return;
+
+        lastSyncedFpRef.current = buildSyncFingerprint(merged);
+        initialSyncDoneUidRef.current = uid;
+        setState(merged);
+        setLastSyncedAt(new Date().toISOString());
+        setSyncStatus(
+          typeof navigator !== 'undefined' && !navigator.onLine
+            ? 'offline'
+            : 'synced',
+        );
+
+        unsubRemote = subscribeUserCloudState(
+          uid,
+          (remotePartial) => {
+            if (cancelled) return;
+            const currentLocal = latestStateRef.current;
+            const remoteNormalized = normalizeAppState({
+              ...remotePartial,
+              seededBuiltInTemplateIds: Array.from(
+                new Set([
+                  ...(remotePartial.seededBuiltInTemplateIds ?? []),
+                  ...(currentLocal.seededBuiltInTemplateIds ?? []),
+                ]),
+              ),
+              activeSessionId: currentLocal.activeSessionId,
+            });
+
+            const remoteDiff = computeSyncDiff(
+              lastSyncedFpRef.current,
+              remoteNormalized,
+            );
+            if (!hasAnySyncDiff(remoteDiff)) {
+              return;
+            }
+
+            lastSyncedFpRef.current = buildSyncFingerprint(remoteNormalized);
+            setState(remoteNormalized);
+            setLastSyncedAt(new Date().toISOString());
+            setSyncStatus('synced');
+            setSyncError(null);
+          },
+          (err) => {
+            if (cancelled) return;
+            setSyncStatus('error');
+            setSyncError(err.message);
+          },
+        );
+      } catch (err) {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'ไม่สามารถเชื่อมต่อฐานข้อมูล Firebase ได้';
+        setSyncStatus(
+          typeof navigator !== 'undefined' && !navigator.onLine
+            ? 'offline'
+            : 'error',
+        );
+        setSyncError(msg);
+      }
+    };
+
+    void initCloudSync();
+
+    return () => {
+      cancelled = true;
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      if (unsubRemote) unsubRemote();
+    };
+  }, [cloudUser?.uid]);
+
+  // Debounced auto-push on local state changes while signed in
+  useEffect(() => {
+    const uid = cloudUser?.uid;
+    if (!uid || initialSyncDoneUidRef.current !== uid) return;
+
+    const diff = computeSyncDiff(lastSyncedFpRef.current, state);
+    if (!hasAnySyncDiff(diff)) return;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSyncStatus('offline');
+      return;
+    }
+
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+    }
+
+    const stateSnapshot = state;
+    debounceTimerRef.current = window.setTimeout(async () => {
+      debounceTimerRef.current = null;
+      if (initialSyncDoneUidRef.current !== uid) return;
+      const latestDiff = computeSyncDiff(lastSyncedFpRef.current, stateSnapshot);
+      if (!hasAnySyncDiff(latestDiff)) return;
+
+      try {
+        setSyncStatus('syncing');
+        setSyncError(null);
+        await pushSyncDiffToCloud(uid, latestDiff, stateSnapshot);
+        lastSyncedFpRef.current = buildSyncFingerprint(stateSnapshot);
+        setLastSyncedAt(new Date().toISOString());
+        setSyncStatus('synced');
+      } catch (err) {
+        setSyncStatus(
+          typeof navigator !== 'undefined' && !navigator.onLine
+            ? 'offline'
+            : 'error',
+        );
+        setSyncError(
+          err instanceof Error ? err.message : 'ไม่สามารถบันทึกขึ้นคลาวด์ได้',
+        );
+      }
+    }, 700);
+
+    return () => {
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, [state, cloudUser?.uid]);
+
+  const handleCloudSignIn = useCallback(async () => {
+    setSyncError(null);
+    try {
+      await signInWithGoogleAccount();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'เข้าสู่ระบบ Google ไม่สำเร็จ';
+      setSyncError(msg);
+      setToast(msg);
+    }
+  }, []);
+
+  const handleCloudSyncNow = useCallback(async () => {
+    const uid = cloudUser?.uid;
+    if (!uid) return;
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    setSyncStatus('syncing');
+    setSyncError(null);
+    try {
+      const localSnapshot = latestStateRef.current;
+      const pendingDiff = computeSyncDiff(
+        lastSyncedFpRef.current,
+        localSnapshot,
+      );
+      if (hasAnySyncDiff(pendingDiff)) {
+        await pushSyncDiffToCloud(uid, pendingDiff, localSnapshot);
+      }
+
+      const cloudSnapshot = await fetchUserCloudSnapshot(uid);
+      const { merged, needsUpload } = mergeCloudAndLocalState(
+        latestStateRef.current,
+        cloudSnapshot,
+      );
+      if (needsUpload) {
+        const baselineFp = cloudSnapshot
+          ? buildSyncFingerprint(normalizeAppState(cloudSnapshot))
+          : null;
+        const mergeDiff = computeSyncDiff(baselineFp, merged);
+        if (hasAnySyncDiff(mergeDiff)) {
+          await pushSyncDiffToCloud(uid, mergeDiff, merged);
+        }
+      }
+
+      lastSyncedFpRef.current = buildSyncFingerprint(merged);
+      initialSyncDoneUidRef.current = uid;
+      setState(merged);
+      setLastSyncedAt(new Date().toISOString());
+      setSyncStatus('synced');
+      setToast('ซิงค์ข้อมูลกับคลาวด์เรียบร้อยแล้ว');
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'ซิงค์ข้อมูลไม่สำเร็จ';
+      setSyncStatus(
+        typeof navigator !== 'undefined' && !navigator.onLine
+          ? 'offline'
+          : 'error',
+      );
+      setSyncError(msg);
+      setToast(msg);
+    }
+  }, [cloudUser?.uid]);
+
+  const handleCloudSignOut = useCallback(async () => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const uid = cloudUser?.uid;
+    if (uid && initialSyncDoneUidRef.current === uid) {
+      const current = latestStateRef.current;
+      const diff = computeSyncDiff(lastSyncedFpRef.current, current);
+      if (hasAnySyncDiff(diff)) {
+        try {
+          await pushSyncDiffToCloud(uid, diff, current);
+        } catch {
+          // Proceed with sign-out gracefully even if offline
+        }
+      }
+    }
+
+    initialSyncDoneUidRef.current = null;
+    lastSyncedFpRef.current = null;
+    await signOutFromCloud();
+    setSyncStatus(
+      typeof navigator !== 'undefined' && !navigator.onLine
+        ? 'offline'
+        : 'idle',
+    );
+    setSyncError(null);
+    setToast('ออกจากระบบแล้ว (ข้อมูลในเครื่องยังอยู่ครบ)');
+  }, [cloudUser?.uid]);
+
+  const cloudSyncState: CloudSyncStateView = {
+    user: cloudUser,
+    authLoading,
+    syncStatus,
+    lastSyncedAt,
+    syncError,
+    counts: {
+      friends: state.friends.length,
+      templates: (state.shopTemplates ?? []).length,
+      sessions: state.sessions.length,
+    },
+    onSignIn: handleCloudSignIn,
+    onSignOut: handleCloudSignOut,
+    onSyncNow: handleCloudSyncNow,
+  };
 
   const notify = (message: string) => setToast(message);
 
@@ -285,6 +656,7 @@ export function App() {
         friendsCount={state.friends.length}
         sessionsCount={state.sessions.length}
         hasPaymentReady={hasPaymentReady}
+        cloudSyncSlot={<CloudSyncButton {...cloudSyncState} />}
       />
 
       {/* Non-blocking transient toast pill at top-center (pointer-events-none) */}
@@ -387,6 +759,7 @@ export function App() {
               setActiveTab('sessions');
             }}
             onNotify={notify}
+            cloudSync={cloudSyncState}
           />
         )}
       </main>

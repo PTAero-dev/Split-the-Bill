@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { QrCode, ReceiptText, Users } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
 
@@ -9,6 +10,7 @@ interface AppHeaderProps {
   friendsCount: number;
   sessionsCount: number;
   hasPaymentReady: boolean;
+  cloudSyncSlot?: ReactNode;
 }
 
 export function AppHeader({
@@ -17,6 +19,7 @@ export function AppHeader({
   friendsCount,
   sessionsCount,
   hasPaymentReady,
+  cloudSyncSlot,
 }: AppHeaderProps) {
   const navItems: Array<{
     id: TopTab;
@@ -99,6 +102,7 @@ export function AppHeader({
           })}
 
           <InstallAppButton />
+          {cloudSyncSlot}
         </nav>
       </div>
     </header>
