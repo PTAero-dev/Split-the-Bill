@@ -1,0 +1,17 @@
+{
+  "name": "หารบิล — แบ่งบิลร้านอาหารและซูเปอร์มาร์เก็ต",
+  "short_name": "หารบิล",
+  "description": "แอปแบ่งบิลร้านอาหาร คาเฟ่ และซูเปอร์มาร์เก็ต คิด SC/VAT/ส่วนลด พร้อมสร้าง PromptPay QR และใบสรุปรวม",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
