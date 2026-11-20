@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { sortShopTemplates } from '../format';
-import { createReceiptFromTemplate, normalizeAppState } from '../storage';
+import {
+  BUILTIN_SUSHIRO_TEMPLATE_ID,
+  SUSHIRO_PLATE_TIERS,
+  sortShopTemplates,
+} from '../format';
+import {
+  createReceiptFromTemplate,
+  getDefaultState,
+  normalizeAppState,
+} from '../storage';
 import { ME_ID, ShopTemplate } from '../../types';
 
 describe('Shop templates & storage normalization', () => {
@@ -85,14 +93,52 @@ describe('Shop templates & storage normalization', () => {
     expect(sorted.map((t) => t.id)).toEqual(['tpl_b', 'tpl_new', 'tpl_old']);
   });
 
-  it('normalizes legacy AppState without shopTemplates and preserves valid templates', () => {
-    const legacy = normalizeAppState({ myName: 'ตั้ม', friends: [], sessions: [] });
-    expect(legacy.shopTemplates).toEqual([]);
+  it('seeds built-in Sushiro template for new and legacy AppState without duplicating or resurrecting deleted templates', () => {
+    const fresh = getDefaultState();
+    expect(fresh.seededBuiltInTemplateIds).toContain(BUILTIN_SUSHIRO_TEMPLATE_ID);
+    const freshSushiro = fresh.shopTemplates?.find(
+      (t) => t.id === BUILTIN_SUSHIRO_TEMPLATE_ID,
+    );
+    expect(freshSushiro).toBeDefined();
+    expect(freshSushiro?.name).toBe('Sushiro');
+    expect(freshSushiro?.isPinned).toBe(true);
+    expect(freshSushiro?.serviceChargeRate).toBe(10);
+    expect(freshSushiro?.vatRate).toBe(7);
+    expect(freshSushiro?.vatOnServiceCharge).toBe(true);
+    expect(freshSushiro?.plateTiers?.map((t) => [t.label, t.price])).toEqual([
+      ['จานขาว', 30],
+      ['จานแดง', 40],
+      ['จานเงิน', 60],
+      ['จานทอง', 80],
+      ['จานดำ', 100],
+    ]);
+    expect(freshSushiro?.plateTiers).toHaveLength(SUSHIRO_PLATE_TIERS.length);
 
+    // 1. Legacy AppState without shopTemplates or seededBuiltInTemplateIds receives Sushiro automatically
+    const legacy = normalizeAppState({ myName: 'ตั้ม', friends: [], sessions: [] });
+    expect(legacy.seededBuiltInTemplateIds).toContain(BUILTIN_SUSHIRO_TEMPLATE_ID);
+    expect(legacy.shopTemplates).toHaveLength(1);
+    expect(legacy.shopTemplates?.[0].id).toBe(BUILTIN_SUSHIRO_TEMPLATE_ID);
+
+    // 2. Deliberately deleted built-in template stays deleted when seededBuiltInTemplateIds already tracks it
+    const deletedByUser = normalizeAppState({
+      shopTemplates: [],
+      seededBuiltInTemplateIds: [BUILTIN_SUSHIRO_TEMPLATE_ID],
+    });
+    expect(deletedByUser.shopTemplates).toEqual([]);
+    expect(deletedByUser.seededBuiltInTemplateIds).toEqual([
+      BUILTIN_SUSHIRO_TEMPLATE_ID,
+    ]);
+
+    // 3. Existing custom 'Sushiro' template is preserved without adding a duplicate
     const withTemplates = normalizeAppState({
       shopTemplates: [sushiShopA, sushiShopB],
     });
     expect(withTemplates.shopTemplates).toHaveLength(2);
+    expect(withTemplates.shopTemplates?.[0].id).toBe('tpl_a');
     expect(withTemplates.shopTemplates?.[1].name).toBe('ร้านซูชิ B (จานส้ม/ฟ้า/ม่วง)');
+    expect(withTemplates.seededBuiltInTemplateIds).toContain(
+      BUILTIN_SUSHIRO_TEMPLATE_ID,
+    );
   });
 });

@@ -157,7 +157,7 @@ export function ShopTemplatesModal({
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-[#0D1526] px-2 py-1 text-xs text-slate-200 tabular-nums"
                               >
                                 <span
-                                  className="h-3 w-3 rounded-full border border-white/70"
+                                  className="h-3 w-3 rounded-full border border-white/70 ring-1 ring-slate-500/50"
                                   style={{ backgroundColor: pt.colorHex }}
                                 />
                                 <span>฿{pt.price}</span>

@@ -567,10 +567,10 @@ export function ReceiptEditorStep({
                     tpl.plateTiers &&
                     tpl.plateTiers.length > 0 && (
                       <span className="flex items-center -space-x-1">
-                        {tpl.plateTiers.slice(0, 4).map((pt) => (
+                        {tpl.plateTiers.slice(0, 5).map((pt) => (
                           <span
                             key={pt.id}
-                            className="inline-block h-2.5 w-2.5 rounded-full border border-slate-950"
+                            className="inline-block h-2.5 w-2.5 rounded-full border border-white/55"
                             style={{ backgroundColor: pt.colorHex }}
                           />
                         ))}

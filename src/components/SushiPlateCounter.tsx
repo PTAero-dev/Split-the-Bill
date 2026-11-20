@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  ALT_120_SUSHI_PLATE_TIERS,
   DEFAULT_SUSHI_PLATE_TIERS,
   PLATE_COLOR_CHOICES,
   SUSHIRO_PLATE_TIERS,
@@ -34,6 +35,7 @@ interface SushiPlateCounterProps {
 
 const DEFAULT_PLATE_LABELS = new Set([
   'จานเขียว',
+  'จานขาว',
   'จานแดง',
   'จานเงิน',
   'จานทอง',
@@ -41,6 +43,57 @@ const DEFAULT_PLATE_LABELS = new Set([
   'จานสีใหม่',
   ...PLATE_COLOR_CHOICES.map((c) => `จาน${c.label}`),
 ]);
+
+function getHexBrightness(hex: string): number {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return 128;
+  const r = Number.parseInt(clean.slice(0, 2), 16);
+  const g = Number.parseInt(clean.slice(2, 4), 16);
+  const b = Number.parseInt(clean.slice(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return 128;
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+function PlateIcon({
+  colorHex,
+  size = 'md',
+}: {
+  colorHex: string;
+  size?: 'sm' | 'md';
+}) {
+  const brightness = getHexBrightness(colorHex);
+  const isVeryLight = brightness >= 230;
+  const isVeryDark = brightness <= 45;
+  const outerSize = size === 'sm' ? 'h-9 w-9' : 'h-10 w-10';
+  const innerSize = size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5';
+
+  if (isVeryLight) {
+    return (
+      <span
+        className={`flex ${outerSize} shrink-0 items-center justify-center rounded-full border-4 bg-[#f8fafc] shadow-inner ring-1 ring-amber-400/75`}
+        style={{ borderColor: colorHex }}
+      >
+        <span
+          className={`${innerSize} rounded-full border border-amber-500/55 bg-slate-100`}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`flex ${outerSize} shrink-0 items-center justify-center rounded-full border-4 bg-white/95 shadow-inner ${
+        isVeryDark ? 'ring-1 ring-slate-400/55' : ''
+      }`}
+      style={{ borderColor: colorHex }}
+    >
+      <span
+        className={`${innerSize} rounded-full opacity-35`}
+        style={{ backgroundColor: colorHex }}
+      />
+    </span>
+  );
+}
 
 export function SushiPlateCounter({
   receipt,
@@ -283,7 +336,7 @@ export function SushiPlateCounter({
                       {tpl.plateTiers.slice(0, 5).map((pt) => (
                         <span
                           key={pt.id}
-                          className="inline-block h-2.5 w-2.5 rounded-full border border-slate-950"
+                          className="inline-block h-2.5 w-2.5 rounded-full border border-white/55"
                           style={{ backgroundColor: pt.colorHex }}
                         />
                       ))}
@@ -357,17 +410,17 @@ export function SushiPlateCounter({
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                onClick={() => applyTierPreset(DEFAULT_SUSHI_PLATE_TIERS)}
-                className="min-h-[36px] rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
-              >
-                ครบสี 30/40/60/80/120
-              </button>
-              <button
-                type="button"
                 onClick={() => applyTierPreset(SUSHIRO_PLATE_TIERS)}
                 className="min-h-[36px] rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
               >
-                Sushiro 40/60/80/120
+                Sushiro (30/40/60/80/100)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyTierPreset(ALT_120_SUSHI_PLATE_TIERS)}
+                className="min-h-[36px] rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+              >
+                ชุด 30/40/60/80/120
               </button>
             </div>
           </div>
@@ -380,15 +433,7 @@ export function SushiPlateCounter({
               >
                 {/* Row 1: Preview + Name + Price + Delete */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-4 bg-white/95 shadow-inner"
-                    style={{ borderColor: tier.colorHex }}
-                  >
-                    <span
-                      className="h-3 w-3 rounded-full opacity-40"
-                      style={{ backgroundColor: tier.colorHex }}
-                    />
-                  </span>
+                  <PlateIcon colorHex={tier.colorHex} size="sm" />
 
                   <input
                     type="text"
@@ -604,13 +649,9 @@ export function SushiPlateCounter({
                         onClick={() => setShowTierEditor(true)}
                         title="แตะเพื่อเปลี่ยนสีหรือราคาจาน"
                         aria-label={`เปลี่ยนสีหรือราคาของ ${tier.label}`}
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 bg-white/95 shadow-inner transition-transform hover:scale-105"
-                        style={{ borderColor: tier.colorHex }}
+                        className="shrink-0 rounded-full transition-transform hover:scale-105"
                       >
-                        <span
-                          className="h-3.5 w-3.5 rounded-full opacity-35"
-                          style={{ backgroundColor: tier.colorHex }}
-                        />
+                        <PlateIcon colorHex={tier.colorHex} size="md" />
                       </button>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-slate-100">

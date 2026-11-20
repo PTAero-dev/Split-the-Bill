@@ -104,6 +104,7 @@ export interface AppState {
   sessions: DailySession[];
   activeSessionId: string | null;
   shopTemplates?: ShopTemplate[];
+  seededBuiltInTemplateIds?: string[];
 }
 
 export interface ParticipantInfo {

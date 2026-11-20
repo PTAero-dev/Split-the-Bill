@@ -89,19 +89,40 @@ export function getFriendColor(colorId?: string): FriendColorOption {
   return FRIEND_COLORS.find((c) => c.id === colorId) ?? FRIEND_COLORS[1];
 }
 
-export const DEFAULT_SUSHI_PLATE_TIERS: PlateTier[] = [
-  { id: 'plate_30', label: 'จานเขียว', colorHex: '#22c55e', price: 30 },
-  { id: 'plate_40', label: 'จานแดง', colorHex: '#ef4444', price: 40 },
-  { id: 'plate_60', label: 'จานเงิน', colorHex: '#cbd5e1', price: 60 },
-  { id: 'plate_80', label: 'จานทอง', colorHex: '#eab308', price: 80 },
-  { id: 'plate_120', label: 'จานดำ', colorHex: '#334155', price: 120 },
+export const SUSHIRO_PLATE_TIERS: PlateTier[] = [
+  { id: 'sushiro_white_30', label: 'จานขาว', colorHex: '#f8fafc', price: 30 },
+  { id: 'sushiro_red_40', label: 'จานแดง', colorHex: '#ef4444', price: 40 },
+  { id: 'sushiro_silver_60', label: 'จานเงิน', colorHex: '#cbd5e1', price: 60 },
+  { id: 'sushiro_gold_80', label: 'จานทอง', colorHex: '#d97706', price: 80 },
+  { id: 'sushiro_black_100', label: 'จานดำ', colorHex: '#1e293b', price: 100 },
 ];
 
-export const SUSHIRO_PLATE_TIERS: PlateTier[] = [
-  { id: 'plate_40', label: 'จานแดง', colorHex: '#ef4444', price: 40 },
-  { id: 'plate_60', label: 'จานเงิน', colorHex: '#cbd5e1', price: 60 },
-  { id: 'plate_80', label: 'จานทอง', colorHex: '#eab308', price: 80 },
-  { id: 'plate_120', label: 'จานดำ', colorHex: '#334155', price: 120 },
+export const DEFAULT_SUSHI_PLATE_TIERS: PlateTier[] = SUSHIRO_PLATE_TIERS.map(
+  (t) => ({ ...t }),
+);
+
+export const ALT_120_SUSHI_PLATE_TIERS: PlateTier[] = [
+  { id: 'alt_white_30', label: 'จานขาว', colorHex: '#f8fafc', price: 30 },
+  { id: 'alt_red_40', label: 'จานแดง', colorHex: '#ef4444', price: 40 },
+  { id: 'alt_silver_60', label: 'จานเงิน', colorHex: '#cbd5e1', price: 60 },
+  { id: 'alt_gold_80', label: 'จานทอง', colorHex: '#d97706', price: 80 },
+  { id: 'alt_black_120', label: 'จานดำ', colorHex: '#1e293b', price: 120 },
+];
+
+export const BUILTIN_SUSHIRO_TEMPLATE_ID = 'tpl_builtin_sushiro';
+
+export const BUILTIN_SHOP_TEMPLATES: ShopTemplate[] = [
+  {
+    id: BUILTIN_SUSHIRO_TEMPLATE_ID,
+    name: 'Sushiro',
+    category: 'sushi',
+    serviceChargeRate: 10,
+    vatRate: 7,
+    vatOnServiceCharge: true,
+    plateTiers: SUSHIRO_PLATE_TIERS.map((t) => ({ ...t })),
+    isPinned: true,
+    lastUsedAt: '2026-01-01T00:00:00.000Z',
+  },
 ];
 
 export const PLATE_COLOR_CHOICES: Array<{ label: string; hex: string }> = [
@@ -177,7 +198,7 @@ export const RECEIPT_PRESETS: ReceiptPreset[] = [
     id: 'sushi_belt',
     label: 'ซูชิสายพาน (นับจานสี ++)',
     shortLabel: 'จานสี + SC 10% + VAT 7%',
-    description: 'นับจำนวนจานแต่ละสีรายคน (30/40/60/80/120) + เมนูเสริม',
+    description: 'นับจำนวนจานแต่ละสีรายคน (ขาว 30 / แดง 40 / เงิน 60 / ทอง 80 / ดำ 100) + เมนูเสริม',
     category: 'sushi',
     serviceChargeRate: 10,
     vatRate: 7,

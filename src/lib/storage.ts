@@ -10,12 +10,22 @@ import {
   ShopTemplate,
 } from '../types';
 import {
+  BUILTIN_SHOP_TEMPLATES,
   DEFAULT_SUSHI_PLATE_TIERS,
   createId,
   todayIsoDate,
 } from './format';
 
 export const STORAGE_KEY = 'splitbill_thai_v1';
+
+function cloneShopTemplate(tpl: ShopTemplate): ShopTemplate {
+  return {
+    ...tpl,
+    plateTiers: tpl.plateTiers
+      ? tpl.plateTiers.map((t) => ({ ...t }))
+      : undefined,
+  };
+}
 
 export function getDefaultPaymentProfile(): PaymentProfile {
   return {
@@ -37,7 +47,8 @@ export function getDefaultState(): AppState {
     paymentProfile: getDefaultPaymentProfile(),
     sessions: [],
     activeSessionId: null,
-    shopTemplates: [],
+    shopTemplates: BUILTIN_SHOP_TEMPLATES.map(cloneShopTemplate),
+    seededBuiltInTemplateIds: BUILTIN_SHOP_TEMPLATES.map((t) => t.id),
   };
 }
 
@@ -80,6 +91,30 @@ export function normalizeAppState(parsed: Partial<AppState>): AppState {
       )
     : [];
 
+  const seededSet = new Set<string>(
+    Array.isArray(parsed.seededBuiltInTemplateIds)
+      ? parsed.seededBuiltInTemplateIds.filter(
+          (id): id is string => typeof id === 'string',
+        )
+      : [],
+  );
+
+  const seededAdditions: ShopTemplate[] = [];
+  for (const builtin of BUILTIN_SHOP_TEMPLATES) {
+    if (!seededSet.has(builtin.id)) {
+      seededSet.add(builtin.id);
+      const builtinNameKey = builtin.name.trim().toLowerCase();
+      const alreadyExists = shopTemplates.some(
+        (t) =>
+          t.id === builtin.id ||
+          t.name.trim().toLowerCase() === builtinNameKey,
+      );
+      if (!alreadyExists) {
+        seededAdditions.push(cloneShopTemplate(builtin));
+      }
+    }
+  }
+
   return {
     version: 1,
     myName:
@@ -96,7 +131,8 @@ export function normalizeAppState(parsed: Partial<AppState>): AppState {
       sessions.some((s) => s.id === parsed.activeSessionId)
         ? parsed.activeSessionId
         : null,
-    shopTemplates,
+    shopTemplates: [...seededAdditions, ...shopTemplates],
+    seededBuiltInTemplateIds: Array.from(seededSet),
   };
 }
 
