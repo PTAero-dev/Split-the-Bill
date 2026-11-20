@@ -304,6 +304,10 @@ describe('Bill calculation engine', () => {
     expect(result.collectibleFromFriends).toBe(400);
     expect(result.collectedAmount).toBe(200); // f1 marked paid
     expect(result.remainingAmount).toBe(200);
+    expect(result.participants.find((p) => p.id === ME_ID)?.color).toBe('teal');
+
+    const customColorResult = calculateSession(session, friends, 'ฉัน', null, 'indigo');
+    expect(customColorResult.participants.find((p) => p.id === ME_ID)?.color).toBe('indigo');
   });
 
   it('computes conveyor belt sushi colored plates (30/40/60/80/120) + shared items + bill discount + ++ tax', () => {

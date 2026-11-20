@@ -407,6 +407,7 @@ export function calculateSession(
   friends: Friend[],
   myName = 'ฉัน',
   myAvatarDataUrl?: string | null,
+  myColor = 'teal',
 ): SessionCalculation {
   const friendMap = new Map(friends.map((f) => [f.id, f]));
   const participantMap = new Map<string, ParticipantInfo>();
@@ -418,7 +419,7 @@ export function calculateSession(
       participantMap.set(ME_ID, {
         id: ME_ID,
         name: myName.trim() || 'ฉัน',
-        color: 'teal',
+        color: myColor || 'teal',
         avatarDataUrl: myAvatarDataUrl ?? null,
         isMe: true,
       });

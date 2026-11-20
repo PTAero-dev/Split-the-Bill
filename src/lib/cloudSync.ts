@@ -53,6 +53,7 @@ export function stripUndefined<T>(value: T): T {
 export interface FirestoreUserProfileDoc {
   version: 1;
   myName: string;
+  myColor: string;
   myAvatarDataUrl: string | null;
   paymentProfile: PaymentProfile;
   seededBuiltInTemplateIds: string[];
@@ -114,6 +115,7 @@ export function toProfileDoc(
   return stripUndefined({
     version: 1,
     myName: clampNonEmptyStr(state.myName, 'ฉัน', 100),
+    myColor: clampStr(state.myColor, 'teal', 40) || 'teal',
     myAvatarDataUrl: clampNullableDataUrl(state.myAvatarDataUrl, 200_000),
     paymentProfile: {
       promptPayId: clampStr(rawProfile.promptPayId, '', 120),
@@ -363,6 +365,16 @@ export function mergeCloudAndLocalState(
     needsUpload = true;
   }
 
+  let myColor = normalizedCloud.myColor ?? 'teal';
+  if (
+    myColor === 'teal' &&
+    normalizedLocal.myColor &&
+    normalizedLocal.myColor !== 'teal'
+  ) {
+    myColor = normalizedLocal.myColor;
+    needsUpload = true;
+  }
+
   let myAvatarDataUrl = normalizedCloud.myAvatarDataUrl ?? null;
   if (!myAvatarDataUrl && normalizedLocal.myAvatarDataUrl) {
     myAvatarDataUrl = normalizedLocal.myAvatarDataUrl;
@@ -463,6 +475,7 @@ export function mergeCloudAndLocalState(
     merged: {
       version: 1,
       myName,
+      myColor,
       myAvatarDataUrl,
       friends: Array.from(friendMap.values()),
       paymentProfile,
@@ -578,6 +591,10 @@ export async function fetchUserCloudSnapshot(
   return {
     version: 1,
     myName: typeof profileData.myName === 'string' ? profileData.myName : 'ฉัน',
+    myColor:
+      typeof profileData.myColor === 'string' && profileData.myColor.trim()
+        ? profileData.myColor
+        : 'teal',
     myAvatarDataUrl:
       typeof profileData.myAvatarDataUrl === 'string'
         ? profileData.myAvatarDataUrl
@@ -688,6 +705,10 @@ export function subscribeUserCloudState(
     onRemoteData({
       version: 1,
       myName: typeof pData.myName === 'string' ? pData.myName : 'ฉัน',
+      myColor:
+        typeof pData.myColor === 'string' && pData.myColor.trim()
+          ? pData.myColor
+          : 'teal',
       myAvatarDataUrl:
         typeof pData.myAvatarDataUrl === 'string'
           ? pData.myAvatarDataUrl

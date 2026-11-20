@@ -83,6 +83,24 @@ export const FRIEND_COLORS: FriendColorOption[] = [
     softBgClass: 'bg-slate-700/60 text-slate-200 border-slate-500/50',
     hex: '#475569',
   },
+  {
+    id: 'orange',
+    name: 'ส้ม',
+    bgClass: 'bg-orange-500',
+    textClass: 'text-slate-950',
+    ringClass: 'ring-orange-400',
+    softBgClass: 'bg-orange-500/15 text-orange-200 border-orange-400/35',
+    hex: '#f97316',
+  },
+  {
+    id: 'pink',
+    name: 'ชมพูสด',
+    bgClass: 'bg-pink-500',
+    textClass: 'text-white',
+    ringClass: 'ring-pink-400',
+    softBgClass: 'bg-pink-500/15 text-pink-200 border-pink-400/35',
+    hex: '#ec4899',
+  },
 ];
 
 export function getFriendColor(colorId?: string): FriendColorOption {

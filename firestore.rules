@@ -12,6 +12,7 @@ rules_version = '2';
 // Fields:
 //   - version: int (required, == 1)
 //   - myName: string (required, 1..100 chars)
+//   - myColor: string (optional, <= 40 chars)
 //   - myAvatarDataUrl: string | null (required key, <= 200000 chars when string)
 //   - paymentProfile: map (required, exact keys):
 //       - promptPayId: string (required, <= 120 chars)
@@ -135,7 +136,16 @@ service cloud.firestore {
     }
 
     function isValidUserProfile(data) {
-      return hasExactFields(data, [
+      return data.keys().hasOnly([
+               'version',
+               'myName',
+               'myColor',
+               'myAvatarDataUrl',
+               'paymentProfile',
+               'seededBuiltInTemplateIds',
+               'updatedAt'
+             ]) &&
+             data.keys().hasAll([
                'version',
                'myName',
                'myAvatarDataUrl',
@@ -145,6 +155,7 @@ service cloud.firestore {
              ]) &&
              data.version is int && data.version == 1 &&
              isValidString(data.myName, 1, 100) &&
+             (!('myColor' in data) || isBoundedString(data.myColor, 40)) &&
              isNullableString(data.myAvatarDataUrl, 200000) &&
              isValidPaymentProfile(data.paymentProfile) &&
              isValidList(data.seededBuiltInTemplateIds, 50) &&

@@ -42,6 +42,7 @@ export function getDefaultState(): AppState {
   return {
     version: 1,
     myName: 'ฉัน',
+    myColor: 'teal',
     myAvatarDataUrl: null,
     friends: [],
     paymentProfile: getDefaultPaymentProfile(),
@@ -121,6 +122,10 @@ export function normalizeAppState(parsed: Partial<AppState>): AppState {
       typeof parsed.myName === 'string' && parsed.myName.trim()
         ? parsed.myName
         : 'ฉัน',
+    myColor:
+      typeof parsed.myColor === 'string' && parsed.myColor.trim()
+        ? parsed.myColor
+        : 'teal',
     myAvatarDataUrl:
       typeof parsed.myAvatarDataUrl === 'string' ? parsed.myAvatarDataUrl : null,
     friends,

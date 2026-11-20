@@ -16,8 +16,10 @@ import { AvatarBadge } from './AvatarBadge';
 
 interface FriendsManagerProps {
   myName: string;
+  myColor: string;
   myAvatarDataUrl?: string | null;
   onChangeMyName: (name: string) => void;
+  onChangeMyColor: (color: string) => void;
   onChangeMyAvatar: (avatarDataUrl: string | null) => void;
   friends: Friend[];
   onAddFriend: (friend: Friend) => void;
@@ -28,8 +30,10 @@ interface FriendsManagerProps {
 
 export function FriendsManager({
   myName,
+  myColor,
   myAvatarDataUrl,
   onChangeMyName,
+  onChangeMyColor,
   onChangeMyAvatar,
   friends,
   onAddFriend,
@@ -136,7 +140,7 @@ export function FriendsManager({
             <div className="flex items-center gap-2.5">
               <AvatarBadge
                 name={myName || 'ฉัน'}
-                color="teal"
+                color={myColor}
                 avatarUrl={myAvatarDataUrl}
                 size="lg"
               />
@@ -173,6 +177,34 @@ export function FriendsManager({
               className="min-h-[44px] w-full rounded-xl border border-slate-700 bg-[#0D1526] px-3.5 py-2 text-base text-slate-100 outline-none focus:border-teal-400 sm:w-48"
             />
           </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800/80 pt-4">
+          <span className="text-sm font-medium text-slate-400">
+            สีประจำตัวของคุณ:
+          </span>
+          {FRIEND_COLORS.map((c) => {
+            const selected = (myColor || 'teal') === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  onChangeMyColor(c.id);
+                  onNotify(`เปลี่ยนสีประจำตัวเป็นสี${c.name}แล้ว`);
+                }}
+                title={c.name}
+                aria-label={`เลือกสีประจำตัวเป็นสี${c.name}`}
+                className={`flex h-9 w-9 items-center justify-center rounded-full ${c.bgClass} transition-transform ${
+                  selected
+                    ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-[#131C31]'
+                    : 'opacity-75 hover:opacity-100'
+                }`}
+              >
+                {selected && <Check className={`h-4 w-4 ${c.textClass}`} />}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -257,7 +289,7 @@ export function FriendsManager({
                       : 'opacity-75 hover:opacity-100'
                   }`}
                 >
-                  {newColor === c.id && <Check className="h-4 w-4 text-slate-950" />}
+                  {newColor === c.id && <Check className={`h-4 w-4 ${c.textClass}`} />}
                 </button>
               ))}
             </div>
@@ -369,7 +401,7 @@ export function FriendsManager({
                             }`}
                           >
                             {editColor === c.id && (
-                              <Check className="h-3.5 w-3.5 text-slate-950" />
+                              <Check className={`h-3.5 w-3.5 ${c.textClass}`} />
                             )}
                           </button>
                         ))}

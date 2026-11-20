@@ -17,6 +17,7 @@ interface SessionListViewProps {
   sessions: DailySession[];
   friends: Friend[];
   myName: string;
+  myColor?: string;
   myAvatarDataUrl?: string | null;
   onCreateSession: () => void;
   onLoadDemo: () => void;
@@ -29,6 +30,7 @@ export function SessionListView({
   sessions,
   friends,
   myName,
+  myColor = 'teal',
   myAvatarDataUrl,
   onCreateSession,
   onLoadDemo,
@@ -107,7 +109,7 @@ export function SessionListView({
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {sessions.map((session) => {
-            const calc = calculateSession(session, friends, myName, myAvatarDataUrl);
+            const calc = calculateSession(session, friends, myName, myAvatarDataUrl, myColor);
             const friendSummaries = calc.personSummaries.filter(
               (p) => !p.participant.isMe && p.roundedTotal > 0,
             );

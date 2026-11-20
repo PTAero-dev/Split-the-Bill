@@ -8,6 +8,7 @@ interface ParticipantsStepProps {
   session: DailySession;
   friends: Friend[];
   myName: string;
+  myColor?: string;
   myAvatarDataUrl?: string | null;
   onUpdateSession: (updater: (prev: DailySession) => DailySession) => void;
   onAddFriendAndSelect: (friend: Friend) => void;
@@ -40,6 +41,7 @@ export function ParticipantsStep({
   session,
   friends,
   myName,
+  myColor = 'teal',
   myAvatarDataUrl,
   onUpdateSession,
   onAddFriendAndSelect,
@@ -169,7 +171,7 @@ export function ParticipantsStep({
             <div className="flex min-w-0 items-center gap-3">
               <AvatarBadge
                 name={myName || 'ฉัน'}
-                color="teal"
+                color={myColor}
                 avatarUrl={myAvatarDataUrl}
               />
               <div className="min-w-0">

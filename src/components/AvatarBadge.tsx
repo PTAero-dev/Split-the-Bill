@@ -30,7 +30,7 @@ export function AvatarBadge({
       <img
         src={avatarUrl}
         alt={name}
-        className={`shrink-0 rounded-full object-cover ring-2 ring-white/15 shadow-xs ${sizeClass}`}
+        className={`shrink-0 rounded-full object-cover ring-2 shadow-xs ${palette.ringClass} ${sizeClass}`}
       />
     );
   }

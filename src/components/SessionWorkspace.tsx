@@ -18,6 +18,7 @@ interface SessionWorkspaceProps {
   session: DailySession;
   friends: Friend[];
   myName: string;
+  myColor?: string;
   myAvatarDataUrl?: string | null;
   paymentProfile: PaymentProfile;
   shopTemplates: ShopTemplate[];
@@ -36,6 +37,7 @@ export function SessionWorkspace({
   session,
   friends,
   myName,
+  myColor = 'teal',
   myAvatarDataUrl,
   paymentProfile,
   shopTemplates,
@@ -63,7 +65,7 @@ export function SessionWorkspace({
     return 'participants';
   });
 
-  const calc = calculateSession(session, friends, myName, myAvatarDataUrl);
+  const calc = calculateSession(session, friends, myName, myAvatarDataUrl, myColor);
 
   const steps: Array<{
     id: WorkspaceStep;
@@ -172,6 +174,7 @@ export function SessionWorkspace({
           session={session}
           friends={friends}
           myName={myName}
+          myColor={myColor}
           myAvatarDataUrl={myAvatarDataUrl}
           onUpdateSession={onUpdateSession}
           onAddFriendAndSelect={onAddFriendAndSelect}

@@ -98,6 +98,7 @@ export interface DailySession {
 export interface AppState {
   version: number;
   myName: string;
+  myColor?: string;
   myAvatarDataUrl?: string | null;
   friends: Friend[];
   paymentProfile: PaymentProfile;

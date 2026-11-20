@@ -71,6 +71,7 @@ describe('Firebase cloudSync helpers', () => {
     const pDoc = toProfileDoc(state, '2026-11-20T12:00:00.000Z');
     expect(Object.keys(pDoc).sort()).toEqual([
       'myAvatarDataUrl',
+      'myColor',
       'myName',
       'paymentProfile',
       'seededBuiltInTemplateIds',
@@ -79,6 +80,7 @@ describe('Firebase cloudSync helpers', () => {
     ]);
     expect(pDoc.version).toBe(1);
     expect(pDoc.myName).toBe('ฉัน');
+    expect(pDoc.myColor).toBe('teal');
     expect(pDoc.myAvatarDataUrl).toBeNull();
     expect(Object.keys(pDoc.paymentProfile).sort()).toEqual([
       'accountName',
@@ -161,6 +163,7 @@ describe('Firebase cloudSync helpers', () => {
     const existingCloud: Partial<AppState> = {
       version: 1,
       myName: 'ต้อม',
+      myColor: 'pink',
       myAvatarDataUrl: null,
       paymentProfile: {
         promptPayId: '0812345678',
@@ -194,6 +197,7 @@ describe('Firebase cloudSync helpers', () => {
     );
     expect(needsUpload).toBe(false);
     expect(merged.myName).toBe('ต้อม');
+    expect(merged.myColor).toBe('pink');
     expect(merged.paymentProfile.promptPayId).toBe('0812345678');
     expect(merged.friends).toHaveLength(2);
     expect(
@@ -204,9 +208,10 @@ describe('Firebase cloudSync helpers', () => {
     expect(merged.sessions).toHaveLength(1);
   });
 
-  it('merges concurrent local + cloud edits cleanly (newer updatedAt wins, union of friends, preserves local QR when cloud empty)', () => {
+  it('merges concurrent local + cloud edits cleanly (newer updatedAt wins, union of friends, preserves local QR and color when cloud default)', () => {
     const local: AppState = {
       ...getDefaultState(),
+      myColor: 'orange',
       friends: [makeFriend({ id: 'fr_local', name: 'นัท' })],
       paymentProfile: {
         promptPayId: '0899999999',
@@ -257,6 +262,7 @@ describe('Firebase cloudSync helpers', () => {
     const { merged, needsUpload } = mergeCloudAndLocalState(local, cloud);
     expect(needsUpload).toBe(true);
     expect(merged.myName).toBe('ปราชญ์');
+    expect(merged.myColor).toBe('orange');
     expect(merged.paymentProfile.promptPayId).toBe('0899999999');
     expect(merged.friends.map((f) => f.id).sort()).toEqual([
       'fr_cloud',

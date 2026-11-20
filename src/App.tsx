@@ -680,6 +680,7 @@ export function App() {
               session={activeSession}
               friends={state.friends}
               myName={state.myName}
+              myColor={state.myColor ?? 'teal'}
               myAvatarDataUrl={state.myAvatarDataUrl}
               paymentProfile={state.paymentProfile}
               shopTemplates={state.shopTemplates ?? []}
@@ -700,6 +701,7 @@ export function App() {
               sessions={state.sessions}
               friends={state.friends}
               myName={state.myName}
+              myColor={state.myColor ?? 'teal'}
               myAvatarDataUrl={state.myAvatarDataUrl}
               onCreateSession={handleCreateSession}
               onLoadDemo={handleLoadDemo}
@@ -712,9 +714,13 @@ export function App() {
         {activeTab === 'friends' && (
           <FriendsManager
             myName={state.myName}
+            myColor={state.myColor ?? 'teal'}
             myAvatarDataUrl={state.myAvatarDataUrl}
             onChangeMyName={(myName) =>
               setState((prev) => ({ ...prev, myName }))
+            }
+            onChangeMyColor={(myColor) =>
+              setState((prev) => ({ ...prev, myColor }))
             }
             onChangeMyAvatar={(myAvatarDataUrl) =>
               setState((prev) => ({ ...prev, myAvatarDataUrl }))
