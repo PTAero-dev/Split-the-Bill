@@ -1,19 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
-  <rect width="128" height="128" rx="28" fill="#0f766e" />
+  <defs>
+    <linearGradient id="obsidianBg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0B1120" />
+      <stop offset="100%" stop-color="#132A3E" />
+    </linearGradient>
+    <linearGradient id="tealGrad" x1="34" y1="24" x2="96" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2DD4BF" />
+      <stop offset="100%" stop-color="#0D9488" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#obsidianBg)" />
   <path
-    d="M34 26h60a6 6 0 0 1 6 6v68l-10-7-9 7-9-7-8 7-8-7-9 7-9-7-10 7V32a6 6 0 0 1 6-6Z"
-    fill="#ffffff"
-  />
-  <rect x="42" y="42" width="44" height="7" rx="3.5" fill="#0f766e" />
-  <rect x="42" y="57" width="28" height="6" rx="3" fill="#94a3b8" />
-  <rect x="74" y="57" width="12" height="6" rx="3" fill="#0d9488" />
-  <rect x="42" y="70" width="24" height="6" rx="3" fill="#94a3b8" />
-  <rect x="74" y="70" width="12" height="6" rx="3" fill="#0d9488" />
-  <circle cx="96" cy="94" r="22" fill="#f59e0b" />
-  <path
-    d="M96 81v26M90 87h9.5a4.5 4.5 0 0 1 0 9H90h10.5a4.5 4.5 0 0 1 0 9H90"
-    stroke="#ffffff"
+    d="M36 25h56a6 6 0 0 1 6 6v68l-9-6-9 6-8-6-8 6-8-6-9 6-9-6-8 6V31a6 6 0 0 1 6-6Z"
+    fill="url(#tealGrad)"
+    fill-opacity="0.18"
+    stroke="#2DD4BF"
     stroke-width="3.5"
+    stroke-linejoin="round"
+  />
+  <rect x="46" y="42" width="36" height="6" rx="3" fill="#5EEAD4" />
+  <rect x="46" y="55" width="24" height="5.5" rx="2.75" fill="#94A3B8" />
+  <rect x="46" y="68" width="20" height="5.5" rx="2.75" fill="#94A3B8" />
+  <circle cx="91" cy="89" r="20" fill="#14B8A6" stroke="#0B1120" stroke-width="4" />
+  <path
+    d="M91 77v24M85.5 82.5h8.5a4 4 0 0 1 0 8h-8.5h9.5a4 4 0 0 1 0 8h-9.5"
+    stroke="#0B1120"
+    stroke-width="3.2"
     stroke-linecap="round"
     stroke-linejoin="round"
   />

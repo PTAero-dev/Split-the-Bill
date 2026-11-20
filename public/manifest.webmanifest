@@ -1,17 +1,39 @@
 {
-  "name": "หารบิล — แบ่งบิลร้านอาหารและซูเปอร์มาร์เก็ต",
+  "id": "/",
+  "name": "หารบิล — แบ่งบิลร้านอาหาร ซูชิสายพาน ซูเปอร์ฯ",
   "short_name": "หารบิล",
-  "description": "แอปแบ่งบิลร้านอาหาร คาเฟ่ และซูเปอร์มาร์เก็ต คิด SC/VAT/ส่วนลด พร้อมสร้าง PromptPay QR และใบสรุปรวม",
+  "description": "แอปแบ่งบิลร้านอาหาร ซูชิสายพาน คาเฟ่ และซูเปอร์มาร์เก็ต คิด SC/VAT/ส่วนลด พร้อมสร้าง PromptPay QR และใบสรุปรวม",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#0f766e",
+  "orientation": "any",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "lang": "th",
   "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

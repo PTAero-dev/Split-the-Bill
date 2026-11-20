@@ -1,4 +1,5 @@
 import { QrCode, ReceiptText, Users } from 'lucide-react';
+import { InstallAppButton } from './InstallAppButton';
 
 export type TopTab = 'sessions' | 'friends' | 'payment';
 
@@ -47,9 +48,11 @@ export function AppHeader({
     <header className="border-b border-slate-800/90 bg-[#0F172A]/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500 text-slate-950 shadow-sm shadow-teal-500/20">
-            <ReceiptText className="h-5 w-5" />
-          </div>
+          <img
+            src="/icon-192.png"
+            alt="โลโก้แอปหารบิล"
+            className="h-10 w-10 shrink-0 rounded-xl border border-teal-400/30 shadow-sm shadow-teal-500/20"
+          />
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold tracking-tight text-white">
               หารบิล
@@ -94,6 +97,8 @@ export function AppHeader({
               </button>
             );
           })}
+
+          <InstallAppButton />
         </nav>
       </div>
     </header>
