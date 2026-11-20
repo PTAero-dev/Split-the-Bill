@@ -1,4 +1,4 @@
-import { PlateTier, ReceiptCategory } from '../types';
+import { PlateTier, ReceiptCategory, ShopTemplate } from '../types';
 
 export interface FriendColorOption {
   id: string;
@@ -105,15 +105,20 @@ export const SUSHIRO_PLATE_TIERS: PlateTier[] = [
 ];
 
 export const PLATE_COLOR_CHOICES: Array<{ label: string; hex: string }> = [
-  { label: 'เขียว', hex: '#22c55e' },
-  { label: 'แดง', hex: '#ef4444' },
+  { label: 'ขาว', hex: '#f8fafc' },
   { label: 'เงิน', hex: '#cbd5e1' },
-  { label: 'ทอง', hex: '#eab308' },
-  { label: 'ดำ', hex: '#334155' },
+  { label: 'เหลือง', hex: '#facc15' },
+  { label: 'ทอง', hex: '#d97706' },
   { label: 'ส้ม', hex: '#f97316' },
-  { label: 'ฟ้า', hex: '#38bdf8' },
-  { label: 'ม่วง', hex: '#a855f7' },
+  { label: 'แดง', hex: '#ef4444' },
   { label: 'ชมพู', hex: '#ec4899' },
+  { label: 'ม่วง', hex: '#a855f7' },
+  { label: 'ฟ้า', hex: '#38bdf8' },
+  { label: 'น้ำเงิน', hex: '#2563eb' },
+  { label: 'เขียวอ่อน', hex: '#22c55e' },
+  { label: 'เขียวเข้ม', hex: '#15803d' },
+  { label: 'น้ำตาล', hex: '#92400e' },
+  { label: 'ดำ', hex: '#1e293b' },
 ];
 
 export interface ReceiptPreset {
@@ -245,4 +250,12 @@ export function createId(prefix = 'id'): string {
     return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
   }
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function sortShopTemplates(templates: ShopTemplate[]): ShopTemplate[] {
+  return [...templates].sort((a, b) => {
+    const pinDiff = Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
+    if (pinDiff !== 0) return pinDiff;
+    return (b.lastUsedAt || '').localeCompare(a.lastUsedAt || '');
+  });
 }

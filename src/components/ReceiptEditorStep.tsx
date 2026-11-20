@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   AlertTriangle,
+  ArrowRight,
+  Bookmark,
+  BookmarkPlus,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -10,12 +13,12 @@ import {
   Percent,
   Plus,
   ShoppingBag,
+  Sparkles,
   Store,
   Tag,
   Trash2,
   Utensils,
   X,
-  ArrowRight,
 } from 'lucide-react';
 import { calculateLineItem, calculateReceipt } from '../lib/calculator';
 import {
@@ -24,8 +27,13 @@ import {
   createId,
   formatBaht,
   getFriendColor,
+  sortShopTemplates,
 } from '../lib/format';
-import { cloneDefaultSushiTiers, createEmptyReceipt } from '../lib/storage';
+import {
+  cloneDefaultSushiTiers,
+  createEmptyReceipt,
+  createReceiptFromTemplate,
+} from '../lib/storage';
 import {
   BillDiscountAllocation,
   BillDiscountTiming,
@@ -35,21 +43,33 @@ import {
   ME_ID,
   ParticipantInfo,
   Receipt,
+  ShopTemplate,
 } from '../types';
 import { AvatarBadge } from './AvatarBadge';
+import { ShopTemplatesModal } from './ShopTemplatesModal';
 import { SushiPlateCounter } from './SushiPlateCounter';
 
 interface ReceiptEditorStepProps {
   session: DailySession;
   participants: ParticipantInfo[];
+  shopTemplates: ShopTemplate[];
   onUpdateSession: (updater: (prev: DailySession) => DailySession) => void;
+  onSaveShopTemplate: (receipt: Receipt) => void;
+  onUpdateShopTemplate: (template: ShopTemplate) => void;
+  onDeleteShopTemplate: (templateId: string) => void;
+  onMarkTemplateUsed: (templateId: string) => void;
   onGoToSummary: () => void;
 }
 
 export function ReceiptEditorStep({
   session,
   participants,
+  shopTemplates,
   onUpdateSession,
+  onSaveShopTemplate,
+  onUpdateShopTemplate,
+  onDeleteShopTemplate,
+  onMarkTemplateUsed,
   onGoToSummary,
 }: ReceiptEditorStepProps) {
   const [activeReceiptId, setActiveReceiptId] = useState<string>(
@@ -58,6 +78,7 @@ export function ReceiptEditorStep({
   const [confirmDeleteReceiptId, setConfirmDeleteReceiptId] = useState<string | null>(
     null,
   );
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
 
   // Add item form state
   const [itemName, setItemName] = useState('');
@@ -156,6 +177,43 @@ export function ReceiptEditorStep({
       receipts: [...prev.receipts, newRc],
     }));
     setActiveReceiptId(newRc.id);
+  };
+
+  const handleAddShopFromTemplate = (template: ShopTemplate) => {
+    const allIds = participants.map((p) => p.id);
+    const defaultPayer = participants.some((p) => p.id === ME_ID)
+      ? ME_ID
+      : (allIds[0] ?? ME_ID);
+    const newRc = createReceiptFromTemplate(template, allIds, defaultPayer);
+    onUpdateSession((prev) => ({
+      ...prev,
+      receipts: [...prev.receipts, newRc],
+    }));
+    onMarkTemplateUsed(template.id);
+    setActiveReceiptId(newRc.id);
+  };
+
+  const applyTemplateToCurrentShop = (template: ShopTemplate) => {
+    updateActiveReceipt((r) => ({
+      ...r,
+      shopName: template.name,
+      category: template.category,
+      serviceChargeRate: template.serviceChargeRate,
+      vatRate: template.vatRate,
+      vatOnServiceCharge: template.vatOnServiceCharge,
+      plateTiers:
+        template.category === 'sushi'
+          ? template.plateTiers && template.plateTiers.length > 0
+            ? template.plateTiers.map((t) => ({ ...t }))
+            : cloneDefaultSushiTiers()
+          : r.plateTiers,
+      plateCounts:
+        template.category === 'sushi' ? (r.plateCounts ?? {}) : r.plateCounts,
+    }));
+    onMarkTemplateUsed(template.id);
+    if (template.category === 'supermarket') {
+      setShowItemDiscount(true);
+    }
   };
 
   const handleDeleteShop = (receiptId: string) => {
@@ -392,6 +450,24 @@ export function ReceiptEditorStep({
 
   const sushiPreset = RECEIPT_PRESETS.find((p) => p.category === 'sushi');
   const superPreset = RECEIPT_PRESETS.find((p) => p.category === 'supermarket');
+  const sortedTemplates = sortShopTemplates(shopTemplates);
+  const quickTemplates = sortedTemplates.slice(0, 6);
+  const sushiTemplates = sortedTemplates.filter((t) => t.category === 'sushi');
+
+  const typedQuery = activeReceipt.shopName.trim().toLowerCase();
+  const matchedTemplate =
+    typedQuery.length >= 2
+      ? sortedTemplates.find((t) => {
+          const tName = t.name.trim().toLowerCase();
+          const alreadySame =
+            tName === typedQuery &&
+            t.category === activeReceipt.category &&
+            t.serviceChargeRate === activeReceipt.serviceChargeRate &&
+            t.vatRate === activeReceipt.vatRate;
+          if (alreadySame) return false;
+          return tName.includes(typedQuery) || typedQuery.includes(tName);
+        })
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -465,6 +541,55 @@ export function ReceiptEditorStep({
             </button>
           )}
         </div>
+
+        {/* 1-Tap Saved Shop Templates Recall Bar */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/90 pt-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
+              <Bookmark className="h-3.5 w-3.5 text-amber-300" />
+              <span>ร้านประจำ (แตะ 1 ครั้งเพื่อเพิ่มร้าน):</span>
+            </span>
+
+            {quickTemplates.length === 0 ? (
+              <span className="text-xs text-slate-500">
+                ยังไม่มี — กด &ldquo;บันทึกเป็นร้านประจำ&rdquo; ในตั้งค่าร้านด้านล่าง
+              </span>
+            ) : (
+              quickTemplates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => handleAddShopFromTemplate(tpl)}
+                  className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-slate-700 bg-[#0D1526] px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-teal-400/60 hover:text-teal-200"
+                >
+                  <span>{tpl.category === 'sushi' ? '🍣 ' : ''}{tpl.name}</span>
+                  {tpl.category === 'sushi' &&
+                    tpl.plateTiers &&
+                    tpl.plateTiers.length > 0 && (
+                      <span className="flex items-center -space-x-1">
+                        {tpl.plateTiers.slice(0, 4).map((pt) => (
+                          <span
+                            key={pt.id}
+                            className="inline-block h-2.5 w-2.5 rounded-full border border-slate-950"
+                            style={{ backgroundColor: pt.colorHex }}
+                          />
+                        ))}
+                      </span>
+                    )}
+                </button>
+              ))
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowTemplatesModal(true)}
+            className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-xl border border-slate-700 bg-[#0D1526] px-3 py-1.5 text-xs font-semibold text-amber-200 hover:border-amber-400/50"
+          >
+            <Bookmark className="h-3.5 w-3.5" />
+            <span>จัดการร้านประจำ ({shopTemplates.length})</span>
+          </button>
+        </div>
       </div>
 
       {/* Main 2-column Desktop / 1-column Mobile & iPad Layout */}
@@ -487,37 +612,48 @@ export function ReceiptEditorStep({
                 </h3>
               </div>
 
-              {session.receipts.length > 1 && (
-                <div>
-                  {confirmDeleteReceiptId === activeReceipt.id ? (
-                    <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSaveShopTemplate(activeReceipt)}
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/25"
+                >
+                  <BookmarkPlus className="h-3.5 w-3.5" />
+                  <span>บันทึกเป็นร้านประจำ</span>
+                </button>
+
+                {session.receipts.length > 1 && (
+                  <div>
+                    {confirmDeleteReceiptId === activeReceipt.id ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteShop(activeReceipt.id)}
+                          className="min-h-[40px] rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
+                        >
+                          ยืนยันลบร้านนี้
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteReceiptId(null)}
+                          className="min-h-[40px] rounded-xl border border-slate-700 px-3 py-1.5 text-xs text-slate-300"
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => handleDeleteShop(activeReceipt.id)}
-                        className="min-h-[40px] rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white"
+                        onClick={() => setConfirmDeleteReceiptId(activeReceipt.id)}
+                        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/25"
                       >
-                        ยืนยันลบร้านนี้
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>ลบร้านนี้</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteReceiptId(null)}
-                        className="min-h-[40px] rounded-xl border border-slate-700 px-3 py-1.5 text-xs text-slate-300"
-                      >
-                        ยกเลิก
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteReceiptId(activeReceipt.id)}
-                      className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/25"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>ลบร้านนี้</span>
-                    </button>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Shop Name + Payer */}
@@ -542,6 +678,16 @@ export function ReceiptEditorStep({
                   placeholder="เช่น ซูชิสายพาน, ร้านอาหาร, Tops..."
                   className="mt-1 min-h-[44px] w-full rounded-xl border border-slate-700 bg-[#0D1526] px-3.5 py-2 text-base text-white outline-none focus:border-teal-400"
                 />
+                {matchedTemplate && (
+                  <button
+                    type="button"
+                    onClick={() => applyTemplateToCurrentShop(matchedTemplate)}
+                    className="mt-1.5 inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-teal-400/40 bg-teal-500/15 px-3 py-1 text-xs font-semibold text-teal-200 hover:bg-teal-500/25"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-teal-300" />
+                    <span>ใช้ค่าจากร้านประจำ &ldquo;{matchedTemplate.name}&rdquo;</span>
+                  </button>
+                )}
               </div>
 
               <div>
@@ -896,6 +1042,9 @@ export function ReceiptEditorStep({
               receipt={activeReceipt}
               shopAttendees={shopAttendees}
               onUpdateReceipt={updateActiveReceipt}
+              sushiTemplates={sushiTemplates}
+              onApplyTemplate={applyTemplateToCurrentShop}
+              onSaveAsTemplate={() => onSaveShopTemplate(activeReceipt)}
             />
           )}
 
@@ -1532,6 +1681,19 @@ export function ReceiptEditorStep({
           </div>
         </aside>
       </div>
+
+      {showTemplatesModal && (
+        <ShopTemplatesModal
+          templates={shopTemplates}
+          onClose={() => setShowTemplatesModal(false)}
+          onAddNewShopFromTemplate={handleAddShopFromTemplate}
+          onApplyToCurrentShop={applyTemplateToCurrentShop}
+          onTogglePin={(tpl) =>
+            onUpdateShopTemplate({ ...tpl, isPinned: !tpl.isPinned })
+          }
+          onDeleteTemplate={onDeleteShopTemplate}
+        />
+      )}
     </div>
   );
 }

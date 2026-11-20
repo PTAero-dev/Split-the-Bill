@@ -14,6 +14,18 @@ export interface PlateTier {
   price: number;
 }
 
+export interface ShopTemplate {
+  id: string;
+  name: string;
+  category: ReceiptCategory;
+  serviceChargeRate: number;
+  vatRate: number;
+  vatOnServiceCharge: boolean;
+  plateTiers?: PlateTier[];
+  isPinned?: boolean;
+  lastUsedAt: string;
+}
+
 export interface Friend {
   id: string;
   name: string;
@@ -91,6 +103,7 @@ export interface AppState {
   paymentProfile: PaymentProfile;
   sessions: DailySession[];
   activeSessionId: string | null;
+  shopTemplates?: ShopTemplate[];
 }
 
 export interface ParticipantInfo {

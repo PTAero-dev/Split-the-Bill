@@ -7,6 +7,7 @@ import {
   PlateTier,
   Receipt,
   ReceiptCategory,
+  ShopTemplate,
 } from '../types';
 import {
   DEFAULT_SUSHI_PLATE_TIERS,
@@ -36,6 +37,7 @@ export function getDefaultState(): AppState {
     paymentProfile: getDefaultPaymentProfile(),
     sessions: [],
     activeSessionId: null,
+    shopTemplates: [],
   };
 }
 
@@ -71,6 +73,13 @@ export function normalizeAppState(parsed: Partial<AppState>): AppState {
     ...(parsed.paymentProfile ?? {}),
   };
 
+  const shopTemplates: ShopTemplate[] = Array.isArray(parsed.shopTemplates)
+    ? parsed.shopTemplates.filter(
+        (t): t is ShopTemplate =>
+          Boolean(t) && typeof t.id === 'string' && typeof t.name === 'string',
+      )
+    : [];
+
   return {
     version: 1,
     myName:
@@ -87,6 +96,7 @@ export function normalizeAppState(parsed: Partial<AppState>): AppState {
       sessions.some((s) => s.id === parsed.activeSessionId)
         ? parsed.activeSessionId
         : null,
+    shopTemplates,
   };
 }
 
@@ -208,6 +218,39 @@ export function createEmptyReceipt(
   }
 
   return base;
+}
+
+export function createReceiptFromTemplate(
+  template: ShopTemplate,
+  attendeeIds: string[],
+  payerId: string = ME_ID,
+): Receipt {
+  const receipt: Receipt = {
+    id: createId('rcpt'),
+    shopName: template.name,
+    category: template.category,
+    payerId,
+    attendeeIds: [...attendeeIds],
+    serviceChargeRate: template.serviceChargeRate,
+    vatRate: template.vatRate,
+    vatOnServiceCharge: template.vatOnServiceCharge,
+    billDiscountType: 'none',
+    billDiscountValue: 0,
+    billDiscountAllocation: 'proportional',
+    billDiscountTiming: 'before_tax',
+    actualReceiptTotal: null,
+    items: [],
+  };
+
+  if (template.category === 'sushi') {
+    receipt.plateTiers =
+      template.plateTiers && template.plateTiers.length > 0
+        ? template.plateTiers.map((t) => ({ ...t }))
+        : cloneDefaultSushiTiers();
+    receipt.plateCounts = {};
+  }
+
+  return receipt;
 }
 
 export function createDemoData(): { friends: Friend[]; session: DailySession } {

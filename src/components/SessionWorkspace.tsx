@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { ArrowLeft, Calendar, CheckCircle2, ReceiptText, Share2, Users } from 'lucide-react';
 import { calculateSession } from '../lib/calculator';
-import { DailySession, Friend, PaymentProfile } from '../types';
+import {
+  DailySession,
+  Friend,
+  PaymentProfile,
+  Receipt,
+  ShopTemplate,
+} from '../types';
 import { ParticipantsStep } from './ParticipantsStep';
 import { ReceiptEditorStep } from './ReceiptEditorStep';
 import { SummaryShareStep } from './SummaryShareStep';
@@ -14,9 +20,14 @@ interface SessionWorkspaceProps {
   myName: string;
   myAvatarDataUrl?: string | null;
   paymentProfile: PaymentProfile;
+  shopTemplates: ShopTemplate[];
   onBackToList: () => void;
   onUpdateSession: (updater: (prev: DailySession) => DailySession) => void;
   onAddFriendAndSelect: (friend: Friend) => void;
+  onSaveShopTemplate: (receipt: Receipt) => void;
+  onUpdateShopTemplate: (template: ShopTemplate) => void;
+  onDeleteShopTemplate: (templateId: string) => void;
+  onMarkTemplateUsed: (templateId: string) => void;
   onGoToPaymentSettings: () => void;
   onNotify: (message: string) => void;
 }
@@ -27,9 +38,14 @@ export function SessionWorkspace({
   myName,
   myAvatarDataUrl,
   paymentProfile,
+  shopTemplates,
   onBackToList,
   onUpdateSession,
   onAddFriendAndSelect,
+  onSaveShopTemplate,
+  onUpdateShopTemplate,
+  onDeleteShopTemplate,
+  onMarkTemplateUsed,
   onGoToPaymentSettings,
   onNotify,
 }: SessionWorkspaceProps) {
@@ -167,7 +183,12 @@ export function SessionWorkspace({
         <ReceiptEditorStep
           session={session}
           participants={calc.participants}
+          shopTemplates={shopTemplates}
           onUpdateSession={onUpdateSession}
+          onSaveShopTemplate={onSaveShopTemplate}
+          onUpdateShopTemplate={onUpdateShopTemplate}
+          onDeleteShopTemplate={onDeleteShopTemplate}
+          onMarkTemplateUsed={onMarkTemplateUsed}
           onGoToSummary={() => setStep('summary')}
         />
       )}

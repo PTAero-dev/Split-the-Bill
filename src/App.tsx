@@ -13,7 +13,14 @@ import {
   loadAppState,
   saveAppState,
 } from './lib/storage';
-import { AppState, DailySession, Friend, ME_ID } from './types';
+import {
+  AppState,
+  DailySession,
+  Friend,
+  ME_ID,
+  Receipt,
+  ShopTemplate,
+} from './types';
 
 export function App() {
   const [state, setState] = useState<AppState>(() => loadAppState());
@@ -183,6 +190,93 @@ export function App() {
     notify(`เพิ่ม "${friend.name}" เข้ากลุ่มเพื่อนและบิลวันนี้แล้ว`);
   };
 
+  const handleSaveShopTemplate = (receipt: Receipt) => {
+    const cleanName = receipt.shopName.trim() || 'ร้านประจำ';
+    const nowIso = new Date().toISOString();
+    const clonedTiers =
+      receipt.category === 'sushi' && receipt.plateTiers
+        ? receipt.plateTiers.map((t) => ({ ...t }))
+        : undefined;
+
+    let isUpdating = false;
+    setState((prev) => {
+      const existing = prev.shopTemplates ?? [];
+      const matchIdx = existing.findIndex(
+        (t) => t.name.trim().toLowerCase() === cleanName.toLowerCase(),
+      );
+
+      if (matchIdx >= 0) {
+        isUpdating = true;
+        const updated = existing.map((t, idx) =>
+          idx === matchIdx
+            ? {
+                ...t,
+                name: cleanName,
+                category: receipt.category,
+                serviceChargeRate: receipt.serviceChargeRate,
+                vatRate: receipt.vatRate,
+                vatOnServiceCharge: receipt.vatOnServiceCharge,
+                plateTiers: clonedTiers,
+                lastUsedAt: nowIso,
+              }
+            : t,
+        );
+        return { ...prev, shopTemplates: updated };
+      }
+
+      const newTemplate: ShopTemplate = {
+        id: createId('tpl'),
+        name: cleanName,
+        category: receipt.category,
+        serviceChargeRate: receipt.serviceChargeRate,
+        vatRate: receipt.vatRate,
+        vatOnServiceCharge: receipt.vatOnServiceCharge,
+        plateTiers: clonedTiers,
+        isPinned: false,
+        lastUsedAt: nowIso,
+      };
+      return {
+        ...prev,
+        shopTemplates: [newTemplate, ...existing],
+      };
+    });
+
+    notify(
+      isUpdating
+        ? `อัปเดตเทมเพลตร้าน "${cleanName}" แล้ว`
+        : `บันทึกเทมเพลตร้าน "${cleanName}" ไว้ใช้ครั้งหน้าแล้ว`,
+    );
+  };
+
+  const handleUpdateShopTemplate = (updated: ShopTemplate) => {
+    setState((prev) => ({
+      ...prev,
+      shopTemplates: (prev.shopTemplates ?? []).map((t) =>
+        t.id === updated.id ? updated : t,
+      ),
+    }));
+  };
+
+  const handleDeleteShopTemplate = (templateId: string) => {
+    setState((prev) => ({
+      ...prev,
+      shopTemplates: (prev.shopTemplates ?? []).filter(
+        (t) => t.id !== templateId,
+      ),
+    }));
+    notify('ลบเทมเพลตร้านประจำแล้ว');
+  };
+
+  const handleMarkTemplateUsed = (templateId: string) => {
+    const nowIso = new Date().toISOString();
+    setState((prev) => ({
+      ...prev,
+      shopTemplates: (prev.shopTemplates ?? []).map((t) =>
+        t.id === templateId ? { ...t, lastUsedAt: nowIso } : t,
+      ),
+    }));
+  };
+
   return (
     <div className="obsidian-bg min-h-dvh text-slate-100">
       <AppHeader
@@ -216,11 +310,16 @@ export function App() {
               myName={state.myName}
               myAvatarDataUrl={state.myAvatarDataUrl}
               paymentProfile={state.paymentProfile}
+              shopTemplates={state.shopTemplates ?? []}
               onBackToList={() =>
                 setState((prev) => ({ ...prev, activeSessionId: null }))
               }
               onUpdateSession={handleUpdateActiveSession}
               onAddFriendAndSelect={handleAddFriendAndSelect}
+              onSaveShopTemplate={handleSaveShopTemplate}
+              onUpdateShopTemplate={handleUpdateShopTemplate}
+              onDeleteShopTemplate={handleDeleteShopTemplate}
+              onMarkTemplateUsed={handleMarkTemplateUsed}
               onGoToPaymentSettings={() => setActiveTab('payment')}
               onNotify={notify}
             />

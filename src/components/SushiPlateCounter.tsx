@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import {
+  BookmarkPlus,
   Camera,
   Check,
   Image as ImageIcon,
   Minus,
+  Palette,
   Plus,
   Settings2,
   Table2,
@@ -18,19 +20,35 @@ import {
   createId,
   formatBaht,
 } from '../lib/format';
-import { ParticipantInfo, PlateTier, Receipt } from '../types';
+import { ParticipantInfo, PlateTier, Receipt, ShopTemplate } from '../types';
 import { AvatarBadge } from './AvatarBadge';
 
 interface SushiPlateCounterProps {
   receipt: Receipt;
   shopAttendees: ParticipantInfo[];
   onUpdateReceipt: (updater: (receipt: Receipt) => Receipt) => void;
+  sushiTemplates?: ShopTemplate[];
+  onApplyTemplate?: (template: ShopTemplate) => void;
+  onSaveAsTemplate?: () => void;
 }
+
+const DEFAULT_PLATE_LABELS = new Set([
+  'จานเขียว',
+  'จานแดง',
+  'จานเงิน',
+  'จานทอง',
+  'จานดำ',
+  'จานสีใหม่',
+  ...PLATE_COLOR_CHOICES.map((c) => `จาน${c.label}`),
+]);
 
 export function SushiPlateCounter({
   receipt,
   shopAttendees,
   onUpdateReceipt,
+  sushiTemplates = [],
+  onApplyTemplate,
+  onSaveAsTemplate,
 }: SushiPlateCounterProps) {
   const tiers = receipt.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS;
   const counts = receipt.plateCounts ?? {};
@@ -82,7 +100,8 @@ export function SushiPlateCounter({
   const setPlateCount = (personId: string, tierId: string, nextQty: number) => {
     const safeQty = Math.max(0, Math.floor(nextQty));
     onUpdateReceipt((r) => {
-      const currentTiers = r.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS.map((t) => ({ ...t }));
+      const currentTiers =
+        r.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS.map((t) => ({ ...t }));
       const prevCounts = r.plateCounts ?? {};
       const prevPerson = prevCounts[personId] ?? {};
       return {
@@ -108,27 +127,47 @@ export function SushiPlateCounter({
 
   const updateTier = (tierId: string, patch: Partial<PlateTier>) => {
     onUpdateReceipt((r) => {
-      const current = r.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS.map((t) => ({ ...t }));
+      const current =
+        r.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS.map((t) => ({ ...t }));
       return {
         ...r,
-        plateTiers: current.map((t) => (t.id === tierId ? { ...t, ...patch } : t)),
+        plateTiers: current.map((t) =>
+          t.id === tierId ? { ...t, ...patch } : t,
+        ),
       };
+    });
+  };
+
+  const selectSwatchColor = (
+    tier: PlateTier,
+    choice: { label: string; hex: string },
+  ) => {
+    const currentLabel = tier.label.trim();
+    const shouldAutoRename =
+      !currentLabel || DEFAULT_PLATE_LABELS.has(currentLabel);
+    updateTier(tier.id, {
+      colorHex: choice.hex,
+      label: shouldAutoRename ? `จาน${choice.label}` : tier.label,
     });
   };
 
   const addCustomTier = () => {
     onUpdateReceipt((r) => {
-      const current = r.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS.map((t) => ({ ...t }));
-      const nextColor =
+      const current =
+        r.plateTiers ?? DEFAULT_SUSHI_PLATE_TIERS.map((t) => ({ ...t }));
+      const usedHex = new Set(current.map((t) => t.colorHex.toLowerCase()));
+      const unusedChoice =
+        PLATE_COLOR_CHOICES.find((c) => !usedHex.has(c.hex.toLowerCase())) ??
         PLATE_COLOR_CHOICES[current.length % PLATE_COLOR_CHOICES.length];
+
       return {
         ...r,
         plateTiers: [
           ...current,
           {
             id: createId('plate'),
-            label: `จาน${nextColor.label}`,
-            colorHex: nextColor.hex,
+            label: `จาน${unusedChoice.label}`,
+            colorHex: unusedChoice.hex,
             price: 100,
           },
         ],
@@ -144,7 +183,6 @@ export function SushiPlateCounter({
     }));
   };
 
-  // Compute person & table totals
   const getPersonPlateSummary = (personId: string) => {
     let totalPlates = 0;
     let totalAmount = 0;
@@ -179,12 +217,12 @@ export function SushiPlateCounter({
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-teal-500/15 text-teal-300 ring-1 ring-teal-400/30">
               🍣
             </span>
-            <h3 className="text-base font-bold text-slate-100">
-              ตัวนับจานซูชิสายพาน (แยกตามสีจาน &amp; รายคน)
+            <h3 className="text-base font-bold text-white">
+              ตัวนับจานซูชิสายพาน (เลือกสี &amp; ราคาจานได้อิสระ)
             </h3>
           </div>
           <p className="mt-1 text-xs text-slate-400">
-            เปิดรูปกองจานที่ถ่ายไว้แล้วจิ้มปุ่ม <strong className="text-teal-300">+</strong> นับตามสีจานของแต่ละคนได้เลย — ด้านล่างมีสรุปยอดจานรวมทั้งโต๊ะให้เทียบกับบิลร้าน
+            แตะที่รูปจานสีหรือปุ่ม <strong className="text-amber-300">เปลี่ยนสี / ราคาจาน</strong> เพื่อตั้งสีจานให้ตรงกับร้านที่กิน แล้วบันทึกเป็นเทมเพลตร้านประจำไว้ใช้ครั้งหน้าได้ในคลิกเดียว
           </p>
         </div>
 
@@ -210,15 +248,64 @@ export function SushiPlateCounter({
             onClick={() => setShowTierEditor((v) => !v)}
             className={`inline-flex min-h-[42px] items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors ${
               showTierEditor
-                ? 'border-amber-400/50 bg-amber-500/20 text-amber-200'
-                : 'border-slate-700 bg-[#0D1526] text-slate-300 hover:border-slate-600'
+                ? 'border-amber-400 bg-amber-400 text-slate-950'
+                : 'border-amber-400/40 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25'
             }`}
           >
             <Settings2 className="h-4 w-4" />
-            <span>ตั้งค่าสี/ราคาจาน</span>
+            <span>เปลี่ยนสี / ราคาจาน</span>
           </button>
         </div>
       </div>
+
+      {/* Saved Sushi Templates 1-Tap Recall Bar */}
+      {(sushiTemplates.length > 0 || onSaveAsTemplate) && (
+        <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-[#0D1526] px-3.5 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-400">
+              เทมเพลตร้านซูชิที่บันทึกไว้:
+            </span>
+            {sushiTemplates.length === 0 ? (
+              <span className="text-xs text-slate-500">
+                ยังไม่มี — ตั้งสีจานให้ตรงแล้วกดบันทึกด้านขวาได้เลย
+              </span>
+            ) : (
+              sushiTemplates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => onApplyTemplate?.(tpl)}
+                  className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-teal-400/35 bg-teal-500/10 px-2.5 py-1 text-xs font-semibold text-teal-200 hover:bg-teal-500/20"
+                >
+                  <span>🍣 {tpl.name}</span>
+                  {tpl.plateTiers && tpl.plateTiers.length > 0 && (
+                    <span className="flex items-center -space-x-1">
+                      {tpl.plateTiers.slice(0, 5).map((pt) => (
+                        <span
+                          key={pt.id}
+                          className="inline-block h-2.5 w-2.5 rounded-full border border-slate-950"
+                          style={{ backgroundColor: pt.colorHex }}
+                        />
+                      ))}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+
+          {onSaveAsTemplate && (
+            <button
+              type="button"
+              onClick={onSaveAsTemplate}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/25"
+            >
+              <BookmarkPlus className="h-3.5 w-3.5" />
+              <span>บันทึกสีจานเป็นเทมเพลตร้านนี้</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Temporary In-Memory Reference Photo Viewer */}
       {refPhotoUrl && (
@@ -259,13 +346,14 @@ export function SushiPlateCounter({
         </div>
       )}
 
-      {/* Plate Tier Customization Drawer */}
+      {/* Visual Plate Color & Price Editor */}
       {showTierEditor && (
-        <div className="mt-4 space-y-3 rounded-xl border border-amber-400/30 bg-[#0D1526] p-4">
+        <div className="mt-4 space-y-3 rounded-xl border border-amber-400/35 bg-[#0D1526] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-bold text-amber-200">
-              ปรับแต่งสีจานและราคาของร้านนี้
-            </span>
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-200">
+              <Palette className="h-4 w-4" />
+              <span>เลือกสีจาน, ชื่อเรียก และราคาต่อจานของร้านนี้</span>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
@@ -284,74 +372,130 @@ export function SushiPlateCounter({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {tiers.map((tier) => (
               <div
                 key={tier.id}
-                className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-700 bg-[#131C31] p-2.5"
+                className="space-y-2.5 rounded-xl border border-slate-700 bg-[#131C31] p-3"
               >
-                <select
-                  aria-label="สีจาน"
-                  value={tier.colorHex}
-                  onChange={(e) =>
-                    updateTier(tier.id, { colorHex: e.target.value })
-                  }
-                  className="min-h-[40px] rounded-lg border border-slate-700 bg-[#0D1526] px-2 text-sm text-slate-100"
-                >
-                  {PLATE_COLOR_CHOICES.map((c) => (
-                    <option key={c.hex} value={c.hex}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  className="h-5 w-5 shrink-0 rounded-full border-2 border-white/60"
-                  style={{ backgroundColor: tier.colorHex }}
-                />
-                <input
-                  type="text"
-                  value={tier.label}
-                  onChange={(e) => updateTier(tier.id, { label: e.target.value })}
-                  aria-label="ชื่อสีจาน"
-                  className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#0D1526] px-2.5 text-base text-slate-100 sm:text-sm"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  value={tier.price}
-                  onChange={(e) =>
-                    updateTier(tier.id, {
-                      price: Math.max(0, Number(e.target.value) || 0),
-                    })
-                  }
-                  aria-label="ราคาต่อจาน"
-                  className="min-h-[40px] w-20 rounded-lg border border-slate-700 bg-[#0D1526] px-2.5 text-base tabular-nums text-teal-300 sm:text-sm"
-                />
-                {tiers.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeTier(tier.id)}
-                    aria-label={`ลบ ${tier.label}`}
-                    className="inline-flex min-h-[38px] min-w-[38px] items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+                {/* Row 1: Preview + Name + Price + Delete */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-4 bg-white/95 shadow-inner"
+                    style={{ borderColor: tier.colorHex }}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                    <span
+                      className="h-3 w-3 rounded-full opacity-40"
+                      style={{ backgroundColor: tier.colorHex }}
+                    />
+                  </span>
+
+                  <input
+                    type="text"
+                    value={tier.label}
+                    onChange={(e) =>
+                      updateTier(tier.id, { label: e.target.value })
+                    }
+                    aria-label="ชื่อสีจาน"
+                    placeholder="เช่น จานส้ม, จานลายทอง"
+                    className="min-h-[42px] min-w-0 flex-1 rounded-lg border border-slate-700 bg-[#0D1526] px-3 text-base text-white outline-none focus:border-teal-400 sm:text-sm"
+                  />
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-slate-400">฿</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      value={tier.price}
+                      onChange={(e) =>
+                        updateTier(tier.id, {
+                          price: Math.max(0, Number(e.target.value) || 0),
+                        })
+                      }
+                      aria-label="ราคาต่อจาน"
+                      className="min-h-[42px] w-20 rounded-lg border border-slate-700 bg-[#0D1526] px-2.5 text-base font-bold text-teal-300 tabular-nums outline-none focus:border-teal-400 sm:text-sm"
+                    />
+                  </div>
+
+                  {tiers.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTier(tier.id)}
+                      aria-label={`ลบ ${tier.label}`}
+                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Row 2: Visual 14-color Swatch Picker + Custom Color Wheel */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {PLATE_COLOR_CHOICES.map((c) => {
+                    const isSelected =
+                      tier.colorHex.toLowerCase() === c.hex.toLowerCase();
+                    return (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        title={`สี${c.label}`}
+                        aria-label={`เลือกสี${c.label}`}
+                        onClick={() => selectSwatchColor(tier, c)}
+                        className={`h-7 w-7 rounded-full border-2 transition-transform ${
+                          isSelected
+                            ? 'scale-110 border-white ring-2 ring-teal-400 ring-offset-1 ring-offset-[#131C31]'
+                            : 'border-white/35 opacity-85 hover:scale-105 hover:opacity-100'
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    );
+                  })}
+
+                  <label
+                    title="เลือกสีเองตามใจชอบ"
+                    className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-slate-600 bg-[#0D1526] px-2 text-[11px] font-medium text-slate-300 hover:border-teal-400"
+                  >
+                    <input
+                      type="color"
+                      value={tier.colorHex}
+                      onChange={(e) =>
+                        updateTier(tier.id, { colorHex: e.target.value })
+                      }
+                      aria-label="เลือกสีจานแบบกำหนดเอง"
+                      className="h-4 w-4 cursor-pointer border-0 bg-transparent p-0"
+                    />
+                    <span>สีอื่น</span>
+                  </label>
+                </div>
               </div>
             ))}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <button
-              type="button"
-              onClick={addCustomTier}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-dashed border-teal-400/40 bg-teal-500/10 px-3.5 py-1.5 text-xs font-semibold text-teal-200 hover:bg-teal-500/20"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>เพิ่มสีจานใหม่</span>
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={addCustomTier}
+                className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-dashed border-teal-400/40 bg-teal-500/10 px-3.5 py-1.5 text-xs font-semibold text-teal-200 hover:bg-teal-500/20"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>เพิ่มสีจานใหม่</span>
+              </button>
+
+              {onSaveAsTemplate && (
+                <button
+                  type="button"
+                  onClick={onSaveAsTemplate}
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-3.5 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/25"
+                >
+                  <BookmarkPlus className="h-3.5 w-3.5" />
+                  <span>บันทึกสีจานเป็นเทมเพลตร้านนี้</span>
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => setShowTierEditor(false)}
@@ -455,17 +599,19 @@ export function SushiPlateCounter({
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      {/* Visual Sushi Plate Icon */}
-                      <span
-                        aria-hidden="true"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 bg-white/90 shadow-inner"
+                      <button
+                        type="button"
+                        onClick={() => setShowTierEditor(true)}
+                        title="แตะเพื่อเปลี่ยนสีหรือราคาจาน"
+                        aria-label={`เปลี่ยนสีหรือราคาของ ${tier.label}`}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 bg-white/95 shadow-inner transition-transform hover:scale-105"
                         style={{ borderColor: tier.colorHex }}
                       >
                         <span
                           className="h-3.5 w-3.5 rounded-full opacity-35"
                           style={{ backgroundColor: tier.colorHex }}
                         />
-                      </span>
+                      </button>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-slate-100">
                           {tier.label}
@@ -504,7 +650,7 @@ export function SushiPlateCounter({
                           setPlateCount(activePerson.id, tier.id, qty + 1)
                         }
                         aria-label={`เพิ่ม ${tier.label} ของ ${activePerson.name}`}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-teal-500 text-slate-950 font-bold hover:bg-teal-400"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-teal-500 font-bold text-slate-950 hover:bg-teal-400"
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -516,7 +662,7 @@ export function SushiPlateCounter({
           )}
         </div>
       ) : (
-        /* Matrix Overview (Desktop/iPad/Scrollable Grid) */
+        /* Matrix Overview */
         <div className="mt-3 space-y-2.5">
           {shopAttendees.map((p) => {
             const summary = getPersonPlateSummary(p.id);
@@ -525,7 +671,7 @@ export function SushiPlateCounter({
                 key={p.id}
                 className="rounded-xl border border-slate-800 bg-[#0D1526] p-3"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
                   <div className="flex items-center gap-2.5">
                     <AvatarBadge
                       name={p.name}
@@ -587,7 +733,7 @@ export function SushiPlateCounter({
         </div>
       )}
 
-      {/* Table-wide Checksum Bar (Compare total plates per color with receipt) */}
+      {/* Table-wide Checksum Bar */}
       <div className="mt-4 rounded-xl border border-slate-700/80 bg-[#0D1526] p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-bold text-slate-300">
